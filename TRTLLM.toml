@@ -27,8 +27,11 @@ python_version = "3.13"
 disable_auth = false
 include = ["TRTLLM_main.py", "dynamo_common.py", "cerebrium.toml"]
 exclude = [".*"]
-docker_base_image_url = "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:1.2.1"
 use_uv = true
+docker_base_image_url = "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:1.2.1"
+
+[pip]
+args = ["--python $(command -v python)", "--compile-bytecode"]
 
 # --- Shell commands ----------------------------------------------------------
 # Runs last, after pip/apt/conda deps and code copy. LMCache's TensorRT-LLM
@@ -49,9 +52,9 @@ healthcheck_endpoint = "/health"
 readycheck_endpoint = "/health"
 
 [cerebrium.hardware]
-cpu = 8
-memory = 32.0
-compute = "HOPPER_H100"
+cpu = 4
+memory = 48.0
+compute = "ADA_L40"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
