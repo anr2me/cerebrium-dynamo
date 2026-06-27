@@ -21,6 +21,9 @@ exclude = [".*"]
 docker_base_image_url = "lmsysorg/sglang:latest-cu130-runtime"
 use_uv = true
 
+[pip]
+args = ["--python $(command -v python)", "--compile-bytecode"]
+
 # --- Pre-build commands -----------------------------------------------------
 # Runs first, before any dependency installation (apt packages below install
 # right after this, per Cerebrium's documented build order). Only the Rust
@@ -53,9 +56,9 @@ healthcheck_endpoint = "/health"
 readycheck_endpoint = "/health"
 
 [cerebrium.hardware]
-cpu = 8
-memory = 32.0
-compute = "HOPPER_H100"
+cpu = 4
+memory = 48.0
+compute = "ADA_L40"
 gpu_count = 1
 provider = "aws"
 region = "us-east-1"
