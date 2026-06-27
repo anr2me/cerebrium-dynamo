@@ -1,0 +1,94 @@
+# =============================================================================
+# vLLM.toml — Dynamo frontend + dynamo.vllm worker, using the real,
+# jointly-documented LMCacheConnectorV1 kv_connector. Per NVIDIA's own
+# integration doc (docs.nvidia.com/dynamo/integrations/kv-cache-integrations/
+# lm-cache), this is the one backend where Dynamo<->LMCache is a coordinated,
+# supported connector rather than LMCache just running inside the engine.
+#
+# Deploy with:
+#   python deploy.py vLLM.toml
+#
+# This file gets copied to ./cerebrium.toml by deploy.py immediately before
+# `cerebrium deploy -y` runs, then the original cerebrium.toml (if any) is
+# restored afterwards. vLLM_main.py and dynamo_common.py must sit next to
+# this file in the project directory — both are picked up by `include`.
+# =============================================================================
+
+[cerebrium.deployment]
+name = "dynamo-vllm-lmcache"
+python_version = "3.13"
+disable_auth = false
+include = ["vLLM_main.py", "dynamo_common.py", "cerebrium.toml"]
+exclude = [".*"]
+docker_base_image_url = "vllm/vllm-openai:latest"
+use_uv = true
+
+# --- Shell commands ----------------------------------------------------------
+# Runs last, after pip/apt/conda deps and code copy. The exotic installs
+# (custom index URL, --pre, --torch-backend, --no-build-isolation) can't be
+# expressed in the declarative [cerebrium.dependencies.pip] table below, so
+# they live here — same uv invocations as the Modal image's
+# .uv_pip_install() chain, just run as raw shell instead of Modal's Image
+# builder API.
+shell_commands = [
+  "uv pip install --upgrade pip uv",
+  "uv pip install 'huggingface-hub>=0.36.0' requests setuptools wheel setuptools-rust",
+  "uv pip install --upgrade --index-url https://download.pytorch.org/whl/cu130 numpy 'torch~=2.11.0' 'torchvision~=0.26.0' 'torchaudio~=2.11.0' 'torchao~=0.17.0' 'torchcodec~=0.11.1'",
+  "uv pip install cupy-cuda13x nixl-cu13",
+  "uv pip install --pre --torch-backend=cu130 'ai-dynamo[vllm]'",
+  "uv pip install --pre --no-build-isolation lmcache",
+]
+
+[cerebrium.runtime.custom]
+port = 8001
+entrypoint = ["python3", "vLLM_main.py"]
+healthcheck_endpoint = "/health"
+readycheck_endpoint = "/health"
+
+[cerebrium.hardware]
+cpu = 8
+memory = 32.0
+compute = "HOPPER_H100"
+gpu_count = 1
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 1
+replica_concurrency = 10
+response_grace_period = 3600
+cooldown = 1800
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+roll_out_duration_seconds = 0
+
+[cerebrium.dependencies.apt]
+clang = "latest"
+llvm = "latest"
+
+[cerebrium.dependencies.pip]
+# Left empty deliberately — every Python dependency above needs a custom
+# index URL, --pre, or --torch-backend flag that this declarative table
+# can't express, so they're all installed via shell_commands instead.
+
+# =============================================================================
+# NOTE ON ENVIRONMENT VARIABLES — there is no [cerebrium.environment] table
+# in cerebrium.toml. All runtime config below is given sane defaults
+# directly in vLLM_main.py via os.environ.get(KEY, default), so this
+# deploys correctly with zero extra setup.
+#
+# To override any of these without editing code, or to set HF_TOKEN, add
+# them under this Cerebrium project's dashboard -> Secrets (non-sensitive
+# values can go in the adjacent "Environment Variables" panel instead) —
+# both are injected into the container as plain env vars, equivalent to
+# Modal's modal.Secret.from_name("huggingface-secret"):
+#   HF_TOKEN                — required only for gated HF models
+#   MODEL_NAME              default: Qwen/Qwen3.6-35B-A3B-FP8
+#   MODEL_REVISION           default: 95a723d08a9490559dae23d0cff1d9466213d989
+#   N_GPUS                   default: 1
+#   MAX_INPUTS               default: 1000
+#   VLLM_FRONTEND_PORT       default: 8001  (must match [cerebrium.runtime.custom].port if changed)
+#   VLLM_SYSTEM_PORT         default: 8082
+#   LMCACHE_MAX_LOCAL_CPU_GB default: 20
+# =============================================================================

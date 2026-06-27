@@ -1,0 +1,106 @@
+# =============================================================================
+# TRTLLM.toml — Dynamo frontend + dynamo.trtllm worker, using LMCache's real
+# KvCacheConnector integration (in-process mode), per
+# docs.lmcache.ai/integrations/tensorrt_llm.html.
+#
+# *** AS OF THE SOURCE SCRIPT'S WRITING, THIS DEPENDS ON UNRELEASED CODE ON
+# BOTH SIDES: *** NVIDIA/TensorRT-LLM PR #12626 (the connector preset
+# registry) is not in a stable TensorRT-LLM release, and the matching
+# LMCache adapter is only on LMCache's `dev` branch. The shell_commands
+# below build both from source per LMCache's own quickstart docs. Once both
+# ship stably, simplify shell_commands to:
+#   uv pip install lmcache "tensorrt_llm>=<version>" --extra-index-url https://pypi.nvidia.com
+# and drop the git+ source build and the TensorRT-LLM from-source steps.
+#
+# Deploy with:
+#   python deploy.py TRTLLM.toml
+#
+# This file gets copied to ./cerebrium.toml by deploy.py immediately before
+# `cerebrium deploy -y` runs, then the original cerebrium.toml (if any) is
+# restored afterwards. TRTLLM_main.py and dynamo_common.py must sit next to
+# this file in the project directory — both are picked up by `include`.
+# =============================================================================
+
+[cerebrium.deployment]
+name = "dynamo-trtllm-lmcache"
+python_version = "3.13"
+disable_auth = false
+include = ["TRTLLM_main.py", "dynamo_common.py", "cerebrium.toml"]
+exclude = [".*"]
+docker_base_image_url = "nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime:1.2.1"
+use_uv = true
+
+# --- Shell commands ----------------------------------------------------------
+# Runs last, after pip/apt/conda deps and code copy. LMCache's TensorRT-LLM
+# connector is only on the `dev` branch until NVIDIA/TensorRT-LLM#12626 and
+# the matching adapter ship stably (see header comment above) — installed
+# here from source per LMCache's own quickstart, same as the Modal image's
+# .uv_pip_install("git+https://github.com/LMCache/LMCache.git@dev", ...).
+shell_commands = [
+  "uv pip install --upgrade pip uv",
+  "uv pip install 'huggingface-hub>=0.36.0' requests setuptools wheel setuptools-rust",
+  "uv pip install --pre --no-build-isolation git+https://github.com/LMCache/LMCache.git@dev",
+]
+
+[cerebrium.runtime.custom]
+port = 8002
+entrypoint = ["python3", "TRTLLM_main.py"]
+healthcheck_endpoint = "/health"
+readycheck_endpoint = "/health"
+
+[cerebrium.hardware]
+cpu = 8
+memory = 32.0
+compute = "HOPPER_H100"
+gpu_count = 1
+provider = "aws"
+region = "us-east-1"
+
+[cerebrium.scaling]
+min_replicas = 0
+max_replicas = 1
+replica_concurrency = 10
+response_grace_period = 3600
+cooldown = 1800
+scaling_metric = "concurrency_utilization"
+scaling_target = 100
+roll_out_duration_seconds = 0
+
+[cerebrium.dependencies.apt]
+# None needed beyond what the nvcr.io/nvidia/ai-dynamo/tensorrtllm-runtime
+# base image already ships with.
+
+[cerebrium.dependencies.pip]
+# Left empty deliberately — the LMCache dev-branch install needs
+# --no-build-isolation and a git+ source URL that this declarative table
+# can't express, so it's installed via shell_commands instead.
+
+# =============================================================================
+# NOTE ON ENVIRONMENT VARIABLES — there is no [cerebrium.environment] table
+# in cerebrium.toml. All runtime config below is given sane defaults
+# directly in TRTLLM_main.py via os.environ.get(KEY, default), so this
+# deploys correctly with zero extra setup.
+#
+# To override any of these without editing code, or to set HF_TOKEN, add
+# them under this Cerebrium project's dashboard -> Secrets (non-sensitive
+# values can go in the adjacent "Environment Variables" panel instead) —
+# both are injected into the container as plain env vars, equivalent to
+# Modal's modal.Secret.from_name("huggingface-secret"):
+#   HF_TOKEN                — required only for gated HF models
+#   MODEL_NAME              default: Qwen/Qwen3.6-35B-A3B-FP8
+#   MODEL_REVISION           default: 95a723d08a9490559dae23d0cff1d9466213d989
+#                             (NOTE: TRTLLM_main.py intentionally does NOT
+#                             pass --revision to dynamo.trtllm — see the
+#                             comment in that file's worker_cmd construction)
+#   N_GPUS                   default: 1
+#   MAX_INPUTS               default: 1000
+#   TRTLLM_FRONTEND_PORT     default: 8002  (must match [cerebrium.runtime.custom].port if changed)
+#   TRTLLM_SYSTEM_PORT       default: 8083
+#   LMCACHE_MAX_LOCAL_CPU_GB default: 20
+#
+# Requires TensorRT-LLM >= 1.2.0 (the KvCacheConnector ABC was added then)
+# and an LMCache build with the c_ops extension — verify with
+# `python -c "import lmcache.c_ops"` inside a deployed container's shell
+# (cerebrium app shell / cerebrium run, see Cerebrium docs) if the worker
+# fails to start with an import error.
+# =============================================================================
