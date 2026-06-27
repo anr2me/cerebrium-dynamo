@@ -25,6 +25,9 @@ docker_base_image_url = "nvidia/cuda:13.0.3-runtime-ubuntu24.04"
 #docker_base_image_url = "vllm/vllm-openai:latest"
 
 
+[pip]
+args = ["--python $(command -v python)", "--compile-bytecode"]
+
 # --- Shell commands ----------------------------------------------------------
 # Runs last, after pip/apt/conda deps and code copy. The exotic installs
 # (custom index URL, --pre, --torch-backend, --no-build-isolation) can't be
