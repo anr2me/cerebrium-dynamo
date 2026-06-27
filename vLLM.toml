@@ -20,8 +20,10 @@ python_version = "3.13"
 disable_auth = false
 include = ["vLLM_main.py", "dynamo_common.py", "cerebrium.toml"]
 exclude = [".*"]
-docker_base_image_url = "vllm/vllm-openai:latest"
 use_uv = true
+docker_base_image_url = "nvidia/cuda:13.0.3-runtime-ubuntu24.04"
+#docker_base_image_url = "vllm/vllm-openai:latest"
+
 
 # --- Shell commands ----------------------------------------------------------
 # Runs last, after pip/apt/conda deps and code copy. The exotic installs
@@ -92,3 +94,4 @@ llvm = "latest"
 #   VLLM_SYSTEM_PORT         default: 8082
 #   LMCACHE_MAX_LOCAL_CPU_GB default: 20
 # =============================================================================
+vllm = "latest"
