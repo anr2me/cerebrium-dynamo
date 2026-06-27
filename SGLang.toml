@@ -18,8 +18,8 @@ python_version = "3.12"
 disable_auth = false
 include = ["SGLang_main.py", "dynamo_common.py", "cerebrium.toml"]
 exclude = [".*"]
-docker_base_image_url = "lmsysorg/sglang:latest-cu130-runtime"
 use_uv = true
+docker_base_image_url = "lmsysorg/sglang:latest-cu130-runtime"
 
 [pip]
 args = ["--python $(command -v python)", "--compile-bytecode"]
