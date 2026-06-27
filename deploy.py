@@ -20,17 +20,22 @@ def cerebrium_deploy(source_toml: str) -> bool:
         print(f"Error: source file '{source_toml}' not found.")
         return False
 
-    # Step 1 — back up existing cerebrium.toml if present
-    if os.path.exists(cerebrium_toml) and cerebrium_toml != source_toml:
+    # Step 1 — back up existing cerebrium.toml if present (skip entirely if
+    # source_toml IS cerebrium.toml — e.g. `python deploy.py cerebrium.toml`,
+    # or the no-argument default — since there's nothing to back up from or
+    # copy into; it's already in place)
+    if cerebrium_toml != source_toml and os.path.exists(cerebrium_toml):
         backup_toml = f"{uuid.uuid4()}.toml"
         os.rename(cerebrium_toml, backup_toml)
         print(f"Existing cerebrium.toml renamed to: {backup_toml}")
-        
-        # Step 2 — copy source toml into place
-        shutil.copy2(source_toml, cerebrium_toml)
-        print(f"Copied '{source_toml}' → cerebrium.toml")
 
     try:
+        # Step 2 — copy source toml into place (skipped if source_toml is
+        # already cerebrium.toml)
+        if cerebrium_toml != source_toml:
+            shutil.copy2(source_toml, cerebrium_toml)
+            print(f"Copied '{source_toml}' → cerebrium.toml")
+
         # Step 3 — run the deploy
         print("Running: cerebrium deploy …")
         try:
@@ -49,13 +54,15 @@ def cerebrium_deploy(source_toml: str) -> bool:
                 print("Deploy succeeded.")
 
     finally:
+        # Step 4 — remove the temporary cerebrium.toml (only if we actually
+        # created one as a stand-in; if source_toml WAS cerebrium.toml,
+        # there's no temporary file — it's the real one, leave it alone)
+        if cerebrium_toml != source_toml and os.path.exists(cerebrium_toml):
+            os.remove(cerebrium_toml)
+            print("Removed temporary cerebrium.toml")
+
+        # Step 5 — restore the original cerebrium.toml if one was backed up
         if backup_toml and os.path.exists(backup_toml):
-            # Step 4 — remove the temporary cerebrium.toml
-            if os.path.exists(cerebrium_toml):
-                os.remove(cerebrium_toml)
-                print("Removed temporary cerebrium.toml")
- 
-            # Step 5 — restore the original cerebrium.toml if one was backed up
             os.rename(backup_toml, cerebrium_toml)
             print(f"Restored {backup_toml} → cerebrium.toml")
 
@@ -66,6 +73,6 @@ if __name__ == "__main__":
     first_argument = "cerebrium.toml"
     if len(sys.argv) > 1:
         first_argument = sys.argv[1]
-        
+
     success = cerebrium_deploy(first_argument)
     print(f"\nDeploy result: {'SUCCESS' if success else 'FAILED'}")
