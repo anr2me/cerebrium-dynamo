@@ -40,7 +40,7 @@ shell_commands = [
   "uv pip install 'huggingface-hub>=0.36.0' requests setuptools wheel setuptools-rust",
   "uv pip install --upgrade --index-url https://download.pytorch.org/whl/cu130 numpy 'torch~=2.11.0' 'torchvision~=0.26.0' 'torchaudio~=2.11.0' 'torchao~=0.17.0' 'torchcodec~=0.11.1'",
   "uv pip install cupy-cuda13x nixl-cu13",
-  "uv pip install --pre --torch-backend=cu130 'ai-dynamo[vllm]'",
+  "uv pip install --pre --torch-backend=cu130 'ai-dynamo[vllm]' ai-dynamo-runtime",
   "uv pip install --pre --no-build-isolation lmcache",
 ]
 
