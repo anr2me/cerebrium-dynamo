@@ -1,4 +1,4 @@
-# Dynamo + LMCache on Cerebrium
+# Dynamo + LMCache on Cerebrium.ai
 
 Serverless [NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo) deployments — SGLang, vLLM, and TensorRT-LLM backends, each paired with [LMCache](https://github.com/LMCache/LMCache) KV-cache offload — running on [Cerebrium](https://www.cerebrium.ai/).
 
